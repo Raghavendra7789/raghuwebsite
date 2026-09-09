@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Theme } from '../types';
 
-const THEME_STORAGE_KEY = 'app_theme_mode';
+export const THEME_STORAGE_KEY = 'theme';
 
 function getInitialTheme(): Theme {
   if (typeof window === 'undefined') return 'light';
   try {
-    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    const saved = localStorage.getItem(THEME_STORAGE_KEY) || localStorage.getItem('app_theme_mode');
     if (saved === 'light' || saved === 'dark') {
       return saved;
     }
@@ -31,22 +31,42 @@ export function useTheme() {
     }
   }, []);
 
+  // Sync DOM root and save theme to localStorage
   useEffect(() => {
     applyTheme(theme);
     try {
       localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch {
-      // ignore storage errors
+      // ignore storage errors in private browsing/sandboxed environments
     }
   }, [theme, applyTheme]);
 
-  // Listen for external OS preference changes if no saved user preference
+  // Synchronize across browser tabs and storage events
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (
+        (event.key === THEME_STORAGE_KEY || event.key === 'app_theme_mode') &&
+        (event.newValue === 'light' || event.newValue === 'dark')
+      ) {
+        setThemeState(event.newValue);
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  // Listen for external OS preference changes if no saved user preference exists
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
-      const saved = localStorage.getItem(THEME_STORAGE_KEY);
-      if (!saved) {
-        setThemeState(e.matches ? 'dark' : 'light');
+      try {
+        const saved = localStorage.getItem(THEME_STORAGE_KEY) || localStorage.getItem('app_theme_mode');
+        if (!saved) {
+          setThemeState(e.matches ? 'dark' : 'light');
+        }
+      } catch {
+        // ignore
       }
     };
 
@@ -54,12 +74,25 @@ export function useTheme() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  const toggleTheme = useCallback(() => {
-    setThemeState((prev) => (prev === 'light' ? 'dark' : 'light'));
-  }, []);
-
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, newTheme);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => {
+      const nextTheme = prev === 'light' ? 'dark' : 'light';
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+      } catch {
+        // ignore
+      }
+      return nextTheme;
+    });
   }, []);
 
   return { theme, toggleTheme, setTheme };
