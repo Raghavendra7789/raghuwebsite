@@ -1,0 +1,6 @@
+{
+  "name": "Theme Toggle",
+  "description": "A clean, modern layout featuring an accessible light and dark mode toggle with Tailwind CSS classes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
